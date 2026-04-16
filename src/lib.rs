@@ -163,17 +163,42 @@ fn stretch_move_parallel(walkers: &mut [Walker], core: &impl MCMCCore, a: f64) {
     });
 }
 
-pub fn mcmc(
-    core: &impl MCMCCore,
-    num_steps: usize,
-    burn_in: usize,
-    n_walkers: usize,
-) -> MCMCOutput {
+#[derive(Debug, Clone, Copy)]
+pub struct MCMCSettings {
+    pub num_steps: usize,
+    pub burn_in: usize,
+    pub num_walkers: usize,
+    pub scale_factor: f64,
+}
+
+impl Default for MCMCSettings {
+    fn default() -> Self {
+        MCMCSettings {
+            num_steps: 10000,
+            burn_in: 1000,
+            num_walkers: 32,
+            scale_factor: 2.0,
+        }
+    }
+}
+
+pub fn mcmc(core: &impl MCMCCore, settings: MCMCSettings) -> MCMCOutput {
+    if settings.num_walkers < 3 {
+        panic!(
+            "With less than 3 walkers the ensemble stepper cannot properly function. At least twice your number of parameters is recommended to avoid convergence issues"
+        )
+    } else if settings.num_walkers < 2 * core.get_bounds().len() {
+        eprintln!(
+            "To properly explore the whole parameter space your walker number ({}) should be at least twice the dimension of your parameter space ({}). You may experience convergence issues.",
+            settings.num_walkers,
+            core.get_bounds().len()
+        )
+    }
+
     let mut rng = Pcg64::seed_from_u64(42);
-    let a = 2.0;
 
     // initialize walkers
-    let mut walkers: Vec<Walker> = (0..n_walkers)
+    let mut walkers: Vec<Walker> = (0..settings.num_walkers)
         .map(|i| {
             let params: Vec<f64> = core
                 .get_bounds()
@@ -190,30 +215,32 @@ pub fn mcmc(
         })
         .collect();
 
-    let mut chains: Vec<Vec<Vec<f64>>> = vec![Vec::with_capacity(num_steps); n_walkers];
-    let mut log_likelihoods: Vec<Vec<f64>> = vec![Vec::with_capacity(num_steps); n_walkers];
+    let mut chains: Vec<Vec<Vec<f64>>> =
+        vec![Vec::with_capacity(settings.num_steps); settings.num_walkers];
+    let mut log_likelihoods: Vec<Vec<f64>> =
+        vec![Vec::with_capacity(settings.num_steps); settings.num_walkers];
 
-    for step in 0..(num_steps + burn_in) {
-        stretch_move_parallel(&mut walkers, core, a);
+    for step in 0..(settings.num_steps + settings.burn_in) {
+        stretch_move_parallel(&mut walkers, core, settings.scale_factor);
 
-        if step >= burn_in {
-            for w in 0..n_walkers {
+        if step >= settings.burn_in {
+            for w in 0..settings.num_walkers {
                 chains[w].push(walkers[w].params.clone());
                 log_likelihoods[w].push(walkers[w].log_prob);
             }
         }
 
         if step % 1000 == 0 {
-            if step < burn_in {
+            if step < settings.burn_in {
                 println!("Burn in step {step}")
             } else {
-                println!("Step {}", step - burn_in);
+                println!("Step {}", step - settings.burn_in);
             }
         }
     }
 
     // Split each walker's chain in half, giving 2*n_walkers chains
-    let half = num_steps / 2;
+    let half = settings.num_steps / 2;
     let split: Vec<Vec<Vec<f64>>> = chains
         .iter()
         .flat_map(|walker_chain| {
