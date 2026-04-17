@@ -2,7 +2,7 @@
 name = "ensemble-mcmc"
 version = "0.1.0"
 edition = "2024"
-description = "A generic stretch move ensemble MCMC sampler"
+description = "A generic affine invariant stretch move ensemble MCMC sampler"
 license = "MIT"
 
 [dependencies]
