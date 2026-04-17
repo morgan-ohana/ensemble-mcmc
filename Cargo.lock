@@ -111,6 +111,7 @@ name = "ensemble-mcmc"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "log",
  "rand",
  "rand_pcg",
  "rayon",

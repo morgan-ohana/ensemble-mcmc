@@ -7,6 +7,7 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1.0.102"
+log = "0.4.29"
 rand = "0.10.1"
 rand_pcg = "0.10.2"
 rayon = "1.12.0"

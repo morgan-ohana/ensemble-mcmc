@@ -35,10 +35,10 @@
 //! println!("Best params: {:?}", output.best_params);
 //! ```
 
+use log;
 use rand::{Rng, RngExt, SeedableRng};
 use rand_pcg::Pcg64;
 use rayon::prelude::*;
-
 use rkyv::{Archive, Deserialize, Serialize, deserialize, rancor::Error};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
@@ -121,6 +121,7 @@ impl MCMCOutput {
             .map_err(|e| anyhow::anyhow!("Serialization failed: {}", e))?;
 
         writer.write_all(&bytes)?;
+        log::info!("Binary file saved as {file_name}");
 
         Ok(())
     }
@@ -141,6 +142,8 @@ impl MCMCOutput {
         // Serialize to JSON
         serde_json::to_writer_pretty(writer, &flattened_output)
             .map_err(|e| anyhow::anyhow!("JSON serialization failed: {}", e))?;
+
+        log::info!("JSON File saved as {file_name}");
 
         Ok(())
     }
@@ -164,6 +167,7 @@ impl MCMCOutput {
 
         let flattened_output: FlattenedMCMCOutput =
             deserialize::<FlattenedMCMCOutput, Error>(archived)?;
+        log::info!("Binary file loaded from {file_name}");
 
         Ok(flattened_output.unpack())
     }
@@ -181,6 +185,8 @@ impl MCMCOutput {
 
         let flattened_output: FlattenedMCMCOutput = serde_json::from_reader(reader)
             .map_err(|e| anyhow::anyhow!("JSON deserialization failed: {}", e))?;
+
+        log::info!("JSON file loaded from {file_name}");
 
         Ok(flattened_output.unpack())
     }
@@ -376,7 +382,7 @@ pub fn mcmc(core: &impl MCMCCore, settings: MCMCSettings) -> MCMCOutput {
             "With less than 3 walkers the ensemble stepper cannot properly function. At least twice your number of parameters is recommended to avoid convergence issues"
         )
     } else if settings.num_walkers < 2 * core.get_bounds().len() {
-        eprintln!(
+        log::warn!(
             "To properly explore the whole parameter space your walker number ({}) should be at least twice the dimension of your parameter space ({}). You may experience convergence issues.",
             settings.num_walkers,
             core.get_bounds().len()
@@ -427,9 +433,9 @@ pub fn mcmc(core: &impl MCMCCore, settings: MCMCSettings) -> MCMCOutput {
 
         if step % 1000 == 0 {
             if step < settings.burn_in {
-                println!("Burn in step {step}")
+                log::info!("Burn in step {step}")
             } else {
-                println!("Step {}", step - settings.burn_in);
+                log::info!("Step {}", step - settings.burn_in);
             }
         }
     }
