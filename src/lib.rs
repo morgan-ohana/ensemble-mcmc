@@ -6,6 +6,8 @@
 //! a randomly chosen partner walker, making the algorithm invariant to affine
 //! transformations of the parameter space and requiring no tuning of step sizes.
 //!
+//! The affine nature of the stretch move algorithm makes it ideal for posteriors with complex or elongated degeneracies.
+//!
 //! # Quick start
 //! ```rust
 //! use ensemble_mcmc::{MCMCCore, MCMCSettings, mcmc};
