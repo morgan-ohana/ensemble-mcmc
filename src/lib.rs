@@ -370,6 +370,8 @@ impl Default for MCMCSettings {
 /// num_walkers` sub-chains that are compared. R-hat values close to 1.0
 /// indicate good convergence.
 ///
+/// Progress is logged via the log crate if a logger has been configured.
+///
 /// # Panics
 /// Panics if `settings.num_walkers < 3` or `settings.scale_factor <= 1.0`.
 ///
