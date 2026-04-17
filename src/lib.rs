@@ -37,7 +37,6 @@
 //! println!("Best params: {:?}", output.best_params);
 //! ```
 
-use log;
 use rand::{Rng, RngExt, SeedableRng};
 use rand_pcg::Pcg64;
 use rayon::prelude::*;
@@ -130,7 +129,7 @@ impl MCMCOutput {
 
     /// Save the output to a human-readable JSON file.
     ///
-    /// Useful for inspecting results or loading them from other languages.
+    /// Useful for inspecting results or loading them from other languages. Additionally can be loaded with [`MCMCOutput::load_from_json`].
     /// For large chains, prefer [`MCMCOutput::save`] which produces smaller files.
     ///
     /// # Errors
@@ -395,7 +394,7 @@ pub fn mcmc(core: &impl MCMCCore, settings: MCMCSettings) -> MCMCOutput {
 
     if settings.scale_factor <= 1.0 {
         panic!(
-            "Scale factor must be greater than 1 for the stretch step probabilily distribution to be well-posed. Your scale factor is {}",
+            "Scale factor must be greater than 1 for the stretch step probability distribution to be well-posed. Your scale factor is {}",
             settings.scale_factor
         )
     }
