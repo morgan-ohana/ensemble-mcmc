@@ -43,6 +43,11 @@ use rkyv::{Archive, Deserialize, Serialize, deserialize, rancor::Error};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 
+/// Internal serialization-friendly representation of [`MCMCOutput`].
+///
+/// `Vec<Vec<f64>>` causes rkyv offset overflow for large chains, so we flatten
+/// the chain to a single `Vec<f64>` and store `n_params` for reconstruction.
+/// This type is not part of the public API.
 #[derive(Archive, Deserialize, Serialize, serde::Serialize, serde::Deserialize)]
 struct FlattenedMCMCOutput {
     best_params: Vec<f64>,
@@ -52,11 +57,6 @@ struct FlattenedMCMCOutput {
     gelman_rubin: Vec<f64>,
 }
 
-/// Internal serialization-friendly representation of [`MCMCOutput`].
-///
-/// `Vec<Vec<f64>>` causes rkyv offset overflow for large chains, so we flatten
-/// the chain to a single `Vec<f64>` and store `n_params` for reconstruction.
-/// This type is not part of the public API.
 impl FlattenedMCMCOutput {
     fn init(output: &MCMCOutput) -> Self {
         let output = output.clone();
@@ -111,10 +111,10 @@ impl MCMCOutput {
     ///
     /// # Errors
     /// Returns an error if the file cannot be created or serialization fails.
-    pub fn save(&self, file_name: String) -> anyhow::Result<()> {
+    pub fn save(&self, file_name: &str) -> anyhow::Result<()> {
         let flattened_output = FlattenedMCMCOutput::init(self);
 
-        let file = File::create(&file_name)?;
+        let file = File::create(file_name)?;
         let mut writer = BufWriter::new(file);
 
         let bytes = rkyv::to_bytes::<Error>(&flattened_output)
@@ -122,7 +122,6 @@ impl MCMCOutput {
 
         writer.write_all(&bytes)?;
 
-        println!("Saved output at {file_name}");
         Ok(())
     }
 
@@ -133,17 +132,16 @@ impl MCMCOutput {
     ///
     /// # Errors
     /// Returns an error if the file cannot be created or serialization fails.
-    pub fn save_as_json(&self, file_name: String) -> anyhow::Result<()> {
+    pub fn save_as_json(&self, file_name: &str) -> anyhow::Result<()> {
         let flattened_output = FlattenedMCMCOutput::init(self);
 
-        let file = File::create(&file_name)?;
+        let file = File::create(file_name)?;
         let writer = BufWriter::new(file);
 
         // Serialize to JSON
         serde_json::to_writer_pretty(writer, &flattened_output)
             .map_err(|e| anyhow::anyhow!("JSON serialization failed: {}", e))?;
 
-        println!("Saved json data at {file_name}");
         Ok(())
     }
 
@@ -154,8 +152,8 @@ impl MCMCOutput {
     /// # Errors
     /// Returns an error if the file cannot be opened, is corrupt, or was not
     /// produced by this library.
-    pub fn load(file_name: String) -> anyhow::Result<MCMCOutput> {
-        let file = File::open(&file_name)?;
+    pub fn load(file_name: &str) -> anyhow::Result<MCMCOutput> {
+        let file = File::open(file_name)?;
         let mut reader = BufReader::new(file);
 
         let mut buffer = Vec::new();
@@ -167,7 +165,23 @@ impl MCMCOutput {
         let flattened_output: FlattenedMCMCOutput =
             deserialize::<FlattenedMCMCOutput, Error>(archived)?;
 
-        println!("File loaded from {file_name}");
+        Ok(flattened_output.unpack())
+    }
+
+    /// Load a previously saved output from a JSON file.
+    ///
+    /// The file must have been created with [`MCMCOutput::save_as_json`].
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be opened, is not valid JSON, or
+    /// does not match the expected format.
+    pub fn load_from_json(file_name: &str) -> anyhow::Result<MCMCOutput> {
+        let file = File::open(file_name)?;
+        let reader = BufReader::new(file);
+
+        let flattened_output: FlattenedMCMCOutput = serde_json::from_reader(reader)
+            .map_err(|e| anyhow::anyhow!("JSON deserialization failed: {}", e))?;
+
         Ok(flattened_output.unpack())
     }
 }
@@ -302,7 +316,7 @@ fn stretch_move_parallel(walkers: &mut [Walker], core: &impl MCMCCore, a: f64) {
 /// update syntax to override only the fields you care about:
 ///
 /// ```rust
-/// use mcmc::MCMCSettings;
+/// use ensemble_mcmc::MCMCSettings;
 ///
 /// let settings = MCMCSettings {
 ///     num_steps: 50_000,
